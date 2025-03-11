@@ -28,6 +28,7 @@ import (
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"slices"
 )
 
 type moduleSourceSchema struct {
@@ -150,6 +151,10 @@ func (s *moduleSourceSchema) Install() {
 			ArgDoc("generator", `The generator to use`).
 			ArgDoc("outputDir", `The output directory for the generated client.`).
 			ArgDoc("dev", `Generate in developer mode`),
+
+		dagql.Func("withoutClient", s.moduleSourceWithoutClient).
+			Doc(`Remove a generated client from the module source.`).
+			ArgDoc("outputDir", `The output directory of the generated client.`),
 	}.Install(s.dag)
 
 	dagql.Fields[*core.SDKConfig]{}.Install(s.dag)
@@ -2322,9 +2327,34 @@ func (s *moduleSourceSchema) moduleSourceWithClient(
 		moduleConfigClient.Dev = &value
 	}
 
+	for _, clientConfig := range src.ConfigClients {
+		if clientConfig.Directory == args.OutputDir.String() {
+			return nil, fmt.Errorf("a client is already generated at directory %s", args.OutputDir.String())
+		}
+	}
+
 	src.ConfigClients = append(src.ConfigClients, moduleConfigClient)
 
 	src.Digest = src.CalcDigest().String()
+
+	return src, nil
+}
+
+func (s *moduleSourceSchema) moduleSourceWithoutClient(
+	_ context.Context,
+	src *core.ModuleSource,
+	arg struct {
+		OutputDir dagql.String
+	},
+) (*core.ModuleSource, error) {
+	src = src.Clone()
+
+	for i, clientConfig := range src.ConfigClients {
+		if clientConfig.Directory == arg.OutputDir.String() {
+			src.ConfigClients = slices.Delete(src.ConfigClients, i, i+1)
+			break
+		}
+	}
 
 	return src, nil
 }

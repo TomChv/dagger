@@ -342,6 +342,16 @@ class ModuleSource extends Client\AbstractObject implements Client\IdAble
     }
 
     /**
+     * Remove a generated client from the module source.
+     */
+    public function withoutClient(string $outputDir): ModuleSource
+    {
+        $innerQueryBuilder = new \Dagger\Client\QueryBuilder('withoutClient');
+        $innerQueryBuilder->setArgument('outputDir', $outputDir);
+        return new \Dagger\ModuleSource($this->client, $this->queryBuilderChain->chain($innerQueryBuilder));
+    }
+
+    /**
      * Remove the provided dependencies from the module source's dependency list.
      */
     public function withoutDependencies(array $dependencies): ModuleSource

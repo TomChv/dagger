@@ -5959,6 +5959,15 @@ export class ModuleSource extends BaseClient {
   }
 
   /**
+   * Remove a generated client from the module source.
+   * @param outputDir The output directory of the generated client.
+   */
+  withoutClient = (outputDir: string): ModuleSource => {
+    const ctx = this._ctx.select("withoutClient", { outputDir })
+    return new ModuleSource(ctx)
+  }
+
+  /**
    * Remove the provided dependencies from the module source's dependency list.
    * @param dependencies The dependencies to remove.
    */

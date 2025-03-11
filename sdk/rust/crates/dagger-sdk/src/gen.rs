@@ -6493,6 +6493,20 @@ impl ModuleSource {
             graphql_client: self.graphql_client.clone(),
         }
     }
+    /// Remove a generated client from the module source.
+    ///
+    /// # Arguments
+    ///
+    /// * `output_dir` - The output directory of the generated client.
+    pub fn without_client(&self, output_dir: impl Into<String>) -> ModuleSource {
+        let mut query = self.selection.select("withoutClient");
+        query = query.arg("outputDir", output_dir.into());
+        ModuleSource {
+            proc: self.proc.clone(),
+            selection: query,
+            graphql_client: self.graphql_client.clone(),
+        }
+    }
     /// Remove the provided dependencies from the module source's dependency list.
     ///
     /// # Arguments

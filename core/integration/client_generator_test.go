@@ -107,7 +107,7 @@ main()`)
 					With(nonNestedDevEngine(c)).
 					With(daggerNonNestedExec("init")).
 					With(tc.setup).
-					With(daggerClientAdd(tc.generator)).
+					With(daggerClientInstall(tc.generator)).
 					With(tc.postSetup)
 
 				t.Run(fmt.Sprintf("dagger run %s", strings.Join(tc.callCmd, " ")), func(ctx context.Context, t *testctx.T) {
@@ -232,7 +232,7 @@ main()
 					With(daggerNonNestedExec("init")).
 					With(daggerNonNestedExec("install", "github.com/shykes/hello@2d789671a44c4d559be506a9bc4b71b0ba6e23c9")).
 					With(tc.setup).
-					With(daggerClientAdd(tc.generator)).
+					With(daggerClientInstall(tc.generator)).
 					With(tc.postSetup)
 
 				t.Run(fmt.Sprintf("dagger run %s", strings.Join(tc.callCmd, " ")), func(ctx context.Context, t *testctx.T) {
@@ -375,7 +375,7 @@ main()
 					With(daggerNonNestedExec("init")).
 					With(daggerNonNestedExec("install", "./dep")).
 					With(tc.setup).
-					With(daggerClientAdd(tc.generator)).
+					With(daggerClientInstall(tc.generator)).
 					With(tc.postSetup)
 
 				t.Run(fmt.Sprintf("dagger run %s", strings.Join(tc.callCmd, " ")), func(ctx context.Context, t *testctx.T) {
@@ -506,7 +506,7 @@ main()
 					WithEnvVariable("_EXPERIMENTAL_DAGGER_CLI_BIN", "/bin/dagger").
 					With(nonNestedDevEngine(c)).
 					With(tc.setup).
-					With(daggerClientAdd(tc.generator)).
+					With(daggerClientInstall(tc.generator)).
 					With(tc.postSetup)
 
 				t.Run(fmt.Sprintf("dagger run %s", strings.Join(tc.callCmd, " ")), func(ctx context.Context, t *testctx.T) {
@@ -622,7 +622,7 @@ main()
 					With(daggerNonNestedExec("init")).
 					With(daggerNonNestedExec("install", "github.com/shykes/hello@2d789671a44c4d559be506a9bc4b71b0ba6e23c9")).
 					With(tc.setup).
-					With(daggerClientAdd(tc.generator)).
+					With(daggerClientInstall(tc.generator)).
 					With(tc.postSetup)
 
 				modCfgContents, err := moduleSrc.
@@ -762,7 +762,7 @@ main()
 					WithEnvVariable("_EXPERIMENTAL_DAGGER_CLI_BIN", "/bin/dagger").
 					With(nonNestedDevEngine(c)).
 					With(tc.setup).
-					With(daggerClientAdd(tc.generator)).
+					With(daggerClientInstall(tc.generator)).
 					With(tc.postSetup)
 
 				modCfgContents, err := moduleSrc.
@@ -907,7 +907,7 @@ main()`)
 						With(nonNestedDevEngine(c)).
 						With(daggerNonNestedExec("init")).
 						With(ts.setup).
-						With(daggerClientAddAt(ts.generator, ts.outputDir)).
+						With(daggerClientInstallAt(ts.generator, ts.outputDir)).
 						With(ts.postSetup)
 
 					t.Run(fmt.Sprintf("dagger run %s", strings.Join(ts.callCmd, " ")), func(ctx context.Context, t *testctx.T) {
@@ -1008,7 +1008,7 @@ main()`)
 					With(nonNestedDevEngine(c)).
 					With(daggerNonNestedExec("init")).
 					With(tc.setup).
-					With(daggerClientAddAt(tc.generator, tc.outputDir)).
+					With(daggerClientInstallAt(tc.generator, tc.outputDir)).
 					With(tc.postSetup)
 
 				t.Run(fmt.Sprintf("dagger run %s", strings.Join(tc.callCmd, " ")), func(ctx context.Context, t *testctx.T) {
@@ -1136,7 +1136,7 @@ func main() {
 
   fmt.Println("result:", res)
 }`).
-			With(daggerClientAdd("go"))
+			With(daggerClientInstall("go"))
 
 		t.Run("dagger run go run .", func(ctx context.Context, t *testctx.T) {
 			out, err := moduleSrc.With(daggerNonNestedRun("go", "run", ".")).

@@ -6214,6 +6214,16 @@ func (r *ModuleSource) WithUpdateDependencies(dependencies []string) *ModuleSour
 	}
 }
 
+// Remove a generated client from the module source.
+func (r *ModuleSource) WithoutClient(outputDir string) *ModuleSource {
+	q := r.query.Select("withoutClient")
+	q = q.Arg("outputDir", outputDir)
+
+	return &ModuleSource{
+		query: q,
+	}
+}
+
 // Remove the provided dependencies from the module source's dependency list.
 func (r *ModuleSource) WithoutDependencies(dependencies []string) *ModuleSource {
 	q := r.query.Select("withoutDependencies")

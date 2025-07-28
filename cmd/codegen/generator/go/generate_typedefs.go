@@ -19,9 +19,15 @@ const (
 )
 
 func (g *GoGenerator) GenerateTypeDefs(ctx context.Context) (*generator.GeneratedState, error) {
+	if g.Config.TypeDefGeneratorConfig == nil {
+		return nil, fmt.Errorf("generateTypeDefs is called but no typedef config is set")
+	}
+
+	typeDefConfig := g.Config.TypeDefGeneratorConfig
+
 	outDir := "."
-	if g.Config.ModuleName != "" {
-		outDir = filepath.Clean(g.Config.ModuleSourcePath)
+	if typeDefConfig.ModuleName != "" {
+		outDir = filepath.Clean(typeDefConfig.ModuleSourcePath)
 	}
 
 	mfs := memfs.New()

@@ -23,14 +23,11 @@ type Config struct {
 	// Generate the client in bundle mode.
 	Bundle bool
 
-	// ModuleConfig is the specific config to generate module.
+	// ModuleConfig is the specific config to generate module or typedefs.
 	ModuleConfig *ModuleGeneratorConfig
 
 	// ClientConfig is the specific config to generate standalone client.
 	ClientConfig *ClientGeneratorConfig
-
-	// TypeDefConfig is the specific config to generate type definitions.
-	TypeDefGeneratorConfig *TypeDefGeneratorConfig
 }
 
 // Close existing dagger client if it exists.
@@ -74,15 +71,4 @@ type ClientGeneratorConfig struct {
 	// This is used by the client generator to automatically serves the
 	// dependencies when connecting to the client.
 	ModuleDependencies []ModuleSourceDependency
-}
-
-type TypeDefGeneratorConfig struct {
-	// Name of the module to generate code for.
-	ModuleName string
-
-	// ModuleSourcePath is the subpath in OutputDir where the module source subpath is located.
-	ModuleSourcePath string
-
-	// ModuleParentPath is the path from the module source subpath to the context directory
-	ModuleParentPath string
 }

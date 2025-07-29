@@ -14,6 +14,10 @@ func entrypointFile() *dagger.File {
 	return binDirectory().File("__dagger.entrypoint.ts")
 }
 
+func typeDefEntrypointFile() *dagger.File {
+	return binDirectory().File("__typedefs.entrypoint.ts")
+}
+
 func denoConfigUpdatorFile() *dagger.File {
 	return binDirectory().File("__deno_config_updator.ts")
 }

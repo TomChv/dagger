@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"typescript-sdk/internal/dagger"
 )
@@ -22,6 +23,7 @@ type TypescriptSdk struct {
 const (
 	ModSourceDirPath         = "/src"
 	EntrypointExecutableFile = "__dagger.entrypoint.ts"
+	TypeDefEntrypointExecutableFile = "__typedefs.entrypoint.ts"
 
 	SrcDir         = "src"
 	GenDir         = "sdk"
@@ -58,6 +60,40 @@ func (t *TypescriptSdk) ModuleRuntime(
 		withUserSourceCode().
 		withEntrypoint().
 		Container(), nil
+}
+
+func (t *TypescriptSdk) ModuleTypeDefs(
+	ctx context.Context,
+	modSource *dagger.ModuleSource,
+	introspectionJSON *dagger.File,
+) (*dagger.Module, error) {
+	cfg, err := analyzeModuleConfig(ctx, modSource)
+	if err != nil {
+		return nil, fmt.Errorf("failed to analyze module config: %w", err)
+	}
+
+	moduleIDFile, err := runtimeBaseContainer(cfg, t.SDKSourceDir).
+		withConfiguredRuntimeEnvironment().
+		withGeneratedSDK(introspectionJSON).
+		withSetupPackageManager().
+		withInstalledDependencies().
+		withUserSourceCode().
+		withTypeDefIntrospection().
+		Container().
+		File("/module-id.json").
+		Contents(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get module typedef: %w", err)
+	}
+
+	var moduleIDResult struct {
+		ModuleID string `json:"moduleID"`
+	}
+	if err := json.Unmarshal([]byte(moduleIDFile), &moduleIDResult); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal module ID: %w", err)
+	}
+
+	return dag.LoadModuleFromID(dagger.ModuleID(moduleIDResult.ModuleID)).Sync(ctx)
 }
 
 // Codegen implements the `Codegen` method from the SDK module interface.

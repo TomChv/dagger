@@ -1,3 +1,5 @@
+import * as fs from "node:fs"
+
 import { dag, Error as DaggerError } from "../../api/client.gen.js"
 import type { JSON } from "../../api/client.gen.js"
 import { ExecError } from "../../common/errors/ExecError.js"
@@ -9,6 +11,27 @@ import { scan } from "../introspector/index.js"
 import { invoke } from "./invoke.js"
 import { load } from "./load.js"
 import { Register } from "./register.js"
+
+export async function typeDefEntrypoint(
+  files: string[],
+  outputFile: string,
+  moduleName: string,
+) {
+  await connection(
+    async () => {
+      console.log("starting scan for module", moduleName)
+      const scanResult = await scan(files, moduleName)
+
+      const result = await new Register(scanResult).run()
+
+      console.log("writing result to file", outputFile)
+      fs.writeFileSync(outputFile, JSON.stringify({ moduleID: result }))
+
+      return
+    },
+    { LogOutput: process.stdout },
+  )
+}
 
 export async function entrypoint(files: string[]) {
   // Start a Dagger session to get the call context

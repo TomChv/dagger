@@ -19,4 +19,7 @@ export { Context } from "./common/context.js"
 
 // Module library
 export * from "./module/decorators.js"
-export { entrypoint } from "./module/entrypoint/entrypoint.js"
+export {
+  entrypoint,
+  typeDefEntrypoint,
+} from "./module/entrypoint/entrypoint.js"

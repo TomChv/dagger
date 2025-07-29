@@ -371,3 +371,43 @@ func (m *moduleRuntimeContainer) withEntrypoint() *moduleRuntimeContainer {
 
 	return m
 }
+
+func (m *moduleRuntimeContainer) withTypeDefIntrospection() *moduleRuntimeContainer {
+	m.ctr = m.ctr.WithMountedFile(
+		m.cfg.typeDefEntrypointPath(),
+		typeDefEntrypointFile(),
+	)
+
+	switch m.cfg.runtime {
+	case Bun:
+		m.ctr = m.ctr.
+			WithExec([]string{"bun", m.cfg.typeDefEntrypointPath(),
+				"--output-file=/module-id.json", "--module-name=" + m.cfg.name,
+			}, dagger.ContainerWithExecOpts{
+				ExperimentalPrivilegedNesting: true,
+			})
+	case Deno:
+		m.ctr = m.ctr.
+			WithExec([]string{"deno", "run", "-A", m.cfg.typeDefEntrypointPath(),
+				"--output-file=/module-id.json", "--module-name=" + m.cfg.name,
+			},
+				dagger.ContainerWithExecOpts{
+					ExperimentalPrivilegedNesting: true,
+				})
+	case Node:
+		m.ctr = m.ctr.
+			// need to specify --tsconfig because final runtime container will change working directory to a separate scratch
+			// dir, without this the paths mapped in the tsconfig.json will not be used and js module loading will fail
+			// need to specify --no-deprecation because the default package.json has no main field which triggers a warning
+			// not useful to display to the user.
+			WithExec(
+				[]string{"tsx", "--no-deprecation", "--tsconfig", m.cfg.tsConfigPath(), m.cfg.typeDefEntrypointPath(),
+					"--output-file=/module-id.json", "--module-name=" + m.cfg.name,
+				},
+				dagger.ContainerWithExecOpts{
+					ExperimentalPrivilegedNesting: true,
+				})
+	}
+
+	return m
+}

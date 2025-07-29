@@ -431,6 +431,10 @@ func (c *moduleConfig) entrypointPath() string {
 	return filepath.Join(ModSourceDirPath, c.subPath, SrcDir, EntrypointExecutableFile)
 }
 
+func (c *moduleConfig) typeDefEntrypointPath() string {
+	return filepath.Join(ModSourceDirPath, c.subPath, SrcDir, TypeDefEntrypointExecutableFile)
+}
+
 // Return the path to the tsconfig.json file inside the module source.
 func (c *moduleConfig) tsConfigPath() string {
 	return filepath.Join(ModSourceDirPath, c.subPath, "tsconfig.json")

@@ -1,0 +1,14 @@
+{
+  "name": "@dagger.io/introspector",
+  "module": "src/index.ts",
+  "type": "module",
+  "dependencies": {
+    "@dagger.io/dagger": "../"
+  },
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "5.9.3"
+  }
+}

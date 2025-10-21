@@ -118,12 +118,21 @@ func (build *Builder) pythonSDKContent(ctx context.Context) (*sdkContent, error)
 }
 
 const TypescriptSDKTSXVersion = "4.15.6"
+const TypeScriptSDKTypeScriptVersion = "5.8.2"
 
 func (build *Builder) typescriptSDKContent(ctx context.Context) (*sdkContent, error) {
-	tsxNodeModule := dag.Container(dagger.ContainerOpts{Platform: build.platform}).
-		From(tsdistconsts.DefaultNodeImageRef).
+	nodeUtilCtr := dag.Container(dagger.ContainerOpts{Platform: build.platform}).
+		From(tsdistconsts.DefaultNodeImageRef)
+
+	tsxNodeModule := nodeUtilCtr.
 		WithExec([]string{"npm", "install", "-g", fmt.Sprintf("tsx@%s", TypescriptSDKTSXVersion)}).
 		Directory("/usr/local/lib/node_modules/tsx")
+
+	typescriptNodeModuleTarball := nodeUtilCtr.
+		WithExec([]string{"npm", "install", "-g", fmt.Sprintf("typescript@%s", TypeScriptSDKTypeScriptVersion)}).
+		WithWorkdir("/usr/local/lib/node_modules").
+		WithExec([]string{"tar", "-zcf", "typescript.tar.gz", "typescript"}).
+		File("typescript.tar.gz")
 
 	rootfs := dag.Directory().WithDirectory("/", build.source.Directory("sdk/typescript"), dagger.DirectoryWithDirectoryOpts{
 		Include: []string{
@@ -162,6 +171,7 @@ func (build *Builder) typescriptSDKContent(ctx context.Context) (*sdkContent, er
 		WithRootfs(rootfs).
 		WithFile("/codegen", build.CodegenBinary()).
 		WithDirectory("/tsx_module", tsxNodeModule).
+		WithFile("/typescript.tar.gz", typescriptNodeModuleTarball).
 		WithDirectory("/bundled_lib", bunBuilderCtr.Directory("/out-node")).
 		AsTarball(dagger.ContainerAsTarballOpts{
 			ForcedCompression: dagger.ImageLayerCompressionZstd,

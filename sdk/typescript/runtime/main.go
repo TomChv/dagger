@@ -57,6 +57,7 @@ func (t *TypescriptSdk) ModuleRuntime(
 		withSetupPackageManager().
 		withInstalledDependencies().
 		withUserSourceCode().
+		withStaticTypeScriptDependency().
 		withEntrypoint().
 		Container(), nil
 }

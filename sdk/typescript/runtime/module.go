@@ -44,7 +44,9 @@ func runtimeBaseContainer(cfg *moduleConfig, sdkSourceDir *dagger.Directory) *mo
 			WithoutEntrypoint().
 			WithMountedCache("/root/.bun/install/cache", dag.CacheVolume(fmt.Sprintf("mod-bun-cache-%s", tsdistconsts.DefaultBunVersion)), dagger.ContainerWithMountedCacheOpts{
 				Sharing: dagger.CacheSharingModePrivate,
-			})
+			}).
+			WithMountedFile("/usr/local/lib/node_modules/typescript.tar.gz", modRuntimeCtr.sdkSourceDir.File("/typescript.tar.gz")).
+			WithExec([]string{"tar", "-xzf", "/usr/local/lib/node_modules/typescript.tar.gz", "-C", "/usr/local/lib/node_modules"})
 	case Deno:
 		modRuntimeCtr.ctr = modRuntimeCtr.ctr.
 			WithoutEntrypoint().
@@ -62,7 +64,9 @@ func runtimeBaseContainer(cfg *moduleConfig, sdkSourceDir *dagger.Directory) *mo
 			WithMountedCache("/root/.pnpm-store", dag.CacheVolume(fmt.Sprintf("pnpm-cache-%s-%s", runtime, version))).
 			// install tsx from its bundled location in the engine image
 			WithMountedDirectory("/usr/local/lib/node_modules/tsx", modRuntimeCtr.sdkSourceDir.Directory("/tsx_module")).
-			WithExec([]string{"ln", "-s", "/usr/local/lib/node_modules/tsx/dist/cli.mjs", "/usr/local/bin/tsx"})
+			WithExec([]string{"ln", "-s", "/usr/local/lib/node_modules/tsx/dist/cli.mjs", "/usr/local/bin/tsx"}).
+			WithMountedFile("/usr/local/lib/node_modules/typescript.tar.gz", modRuntimeCtr.sdkSourceDir.File("/typescript.tar.gz")).
+			WithExec([]string{"tar", "-xzf", "/usr/local/lib/node_modules/typescript.tar.gz", "-C", "/usr/local/lib/node_modules"})
 	}
 
 	return modRuntimeCtr
@@ -145,13 +149,6 @@ func (m *moduleRuntimeContainer) configurePackageJSON(file *dagger.File) *dagger
 		WithWorkdir("/src").
 		WithExec([]string{"npm", "pkg", "set", "type=module"})
 
-	if m.cfg.packageJSONConfig != nil {
-		_, ok := m.cfg.packageJSONConfig.Dependencies["typescript"]
-		if !ok {
-			ctr = ctr.WithExec([]string{"npm", "pkg", "set", "dependencies.typescript=^5.5.4"})
-		}
-	}
-
 	return ctr.File("/src/package.json")
 }
 
@@ -225,8 +222,37 @@ func (m *moduleRuntimeContainer) withGeneratedLockFile() *moduleRuntimeContainer
 	return m
 }
 
+func (m *moduleRuntimeContainer) withStaticTypeScriptDependency() *moduleRuntimeContainer {
+	ctr := m.ctr
+
+	switch m.cfg.runtime {
+	case Bun, Node:
+		if m.cfg.packageJSONConfig != nil {
+			_, ok := m.cfg.packageJSONConfig.Dependencies["typescript"]
+			if !ok {
+				ctr = ctr.
+					WithExec([]string{"npm", "pkg", "set", "dependencies.typescript=5.8.2"}).
+					WithExec([]string{"mkdir", "-p", filepath.Join(m.cfg.modulePath(), "node_modules/typescript")}).
+					WithExec([]string{"cp", "-r", "/usr/local/lib/node_modules/typescript", filepath.Join(m.cfg.modulePath(), "node_modules")})
+			}
+		}
+
+	case Deno:
+		// Skip
+	}
+
+	m.ctr = ctr
+
+	return m
+}
+
 // Installs the dependencies using the detected package manager.
 func (m *moduleRuntimeContainer) withInstalledDependencies() *moduleRuntimeContainer {
+	// Early skip if no dependencies (only apply to Node or Bun)
+	if m.cfg.packageJSONConfig != nil && len(m.cfg.packageJSONConfig.Dependencies) == 0 {
+		return m
+	}
+
 	switch m.cfg.packageManager {
 	case Yarn:
 		if semver.Compare(fmt.Sprintf("v%s", m.cfg.packageManagerVersion), "v3.0.0") <= 0 {

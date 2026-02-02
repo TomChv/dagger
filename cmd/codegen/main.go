@@ -19,6 +19,7 @@ var rootCmd = &cobra.Command{
 func init() {
 	rootCmd.AddCommand(introspectCmd)
 	rootCmd.AddCommand(generateClientCmd)
+	rootCmd.AddCommand(generateClientV2Cmd)
 	rootCmd.AddCommand(generateModuleCmd)
 	rootCmd.AddCommand(generateLibraryCmd)
 	rootCmd.AddCommand(generateTypeDefsCmd)

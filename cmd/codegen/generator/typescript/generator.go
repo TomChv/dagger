@@ -31,6 +31,10 @@ func (g *TypeScriptGenerator) GenerateClient(ctx context.Context, schema *intros
 	return generate(g.Config, ClientGenFile, schema, schemaVersion)
 }
 
+func (g *TypeScriptGenerator) GenerateClientV2(ctx context.Context, schema *introspection.Schema, schemaVersion string) (*generator.GeneratedState, error) {
+	return generate(g.Config, ClientGenFile, schema, schemaVersion)
+}
+
 func (g *TypeScriptGenerator) GenerateLibrary(ctx context.Context, schema *introspection.Schema, schemaVersion string) (*generator.GeneratedState, error) {
 	return generate(g.Config, ClientGenFile, schema, schemaVersion)
 }

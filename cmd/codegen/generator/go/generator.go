@@ -3,6 +3,7 @@ package gogenerator
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"go/format"
 	"go/token"
@@ -34,6 +35,68 @@ var goVersion = strings.TrimPrefix(runtime.Version(), "go")
 
 type GoGenerator struct {
 	Config generator.Config
+}
+
+func generateClient(
+	ctx context.Context,
+	cfg generator.Config,
+	schema *introspection.Schema,
+	schemaVersion string,
+	mfs *memfs.FS,
+	pkgInfo *PackageInfo,
+	pkg *packages.Package,
+	fset *token.FileSet,
+	pass int,
+) error {
+	schemaJSON, err := json.Marshal(schema)
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf("%s\n", schemaJSON)
+
+	funcs := templates.GoTemplateFuncs(ctx, schema, schemaVersion, cfg, pkg, fset, pass)
+	tmpls := templates.ClientTemplates(funcs)
+
+	// Sort template keys for deterministic processing
+	keys := make([]string, 0, len(tmpls))
+	for k := range tmpls {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+
+	for _, k := range keys {
+		tmpl := tmpls[k]
+		dt, err := renderFile(cfg.OutputDir, schema, schemaVersion, pkgInfo, tmpl)
+		if err != nil {
+			return err
+		}
+		if dt == nil {
+			// no contents, skip
+			continue
+		}
+
+		// Special case for client generation, we want to write the file in the specified client directory.
+		if cfg.ClientConfig != nil && cfg.ClientConfig.ClientDir != "" {
+			if err := mfs.MkdirAll(filepath.Join(cfg.ClientConfig.ClientDir, filepath.Dir(k)), 0o755); err != nil {
+				return err
+			}
+			if err := mfs.WriteFile(filepath.Join(cfg.ClientConfig.ClientDir, k), dt, 0600); err != nil {
+				return err
+			}
+
+			continue
+		}
+
+		if err := mfs.MkdirAll(filepath.Dir(k), 0o755); err != nil {
+			return err
+		}
+		if err := mfs.WriteFile(k, dt, 0600); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func generateCode(

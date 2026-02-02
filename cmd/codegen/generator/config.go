@@ -76,6 +76,9 @@ type ClientGeneratorConfig struct {
 	// The name of the module to generate for.
 	ModuleName string
 
+	// The version of the engine used by this module.
+	EngineVersion string
+
 	// The list of all dependencies used by the module.
 	// This is used by the client generator to automatically serves the
 	// dependencies when connecting to the client.

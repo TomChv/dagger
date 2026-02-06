@@ -337,6 +337,15 @@ func (t Directives) ExperimentalReason() string {
 	return fromJSON[string](t.Directive("experimental").Arg("reason"))
 }
 
+func (t Directives) Origin() string {
+	origin := t.Directive("origin")
+	if origin == nil {
+		return ""
+	}
+
+	return fromJSON[string](origin.Arg("module"))
+}
+
 type SourceMap struct {
 	Module   string
 	Filename string

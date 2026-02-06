@@ -241,6 +241,9 @@ func (obj *ModuleObject) TypeDefinition(view call.View) *ast.Definition {
 	if obj.TypeDef.SourceMap.Valid {
 		def.Directives = append(def.Directives, obj.TypeDef.SourceMap.Value.TypeDirective())
 	}
+
+	def.Directives = append(def.Directives, dagql.DirectiveOrigin(obj.Module.OriginalName))
+
 	return def
 }
 
@@ -250,7 +253,8 @@ func (obj *ModuleObject) Install(ctx context.Context, dag *dagql.Server) error {
 	}
 
 	class := dagql.NewClass(dag, dagql.ClassOpts[*ModuleObject]{
-		Typed: obj,
+		Typed:  obj,
+		Origin: obj.Module.OriginalName,
 	})
 	objDef := obj.TypeDef
 	mod := obj.Module
@@ -291,6 +295,9 @@ func (obj *ModuleObject) installConstructor(ctx context.Context, dag *dagql.Serv
 			spec.Directives = append(spec.Directives, objDef.SourceMap.Value.TypeDirective())
 		}
 
+		// Add the module this object is from.
+		spec.Directives = append(spec.Directives, dagql.DirectiveOrigin(obj.Module.OriginalName))
+
 		dag.Root().ObjectType().Extend(
 			spec,
 			func(ctx context.Context, self dagql.AnyResult, _ map[string]dagql.Input) (dagql.AnyResult, error) {
@@ -327,6 +334,9 @@ func (obj *ModuleObject) installConstructor(ctx context.Context, dag *dagql.Serv
 	spec.Name = gqlFieldName(mod.Name())
 	spec.Module = obj.Module.IDModule()
 	spec.GetCacheConfig = fn.CacheConfigForCall
+
+	// Add the module this object is from.
+	spec.Directives = append(spec.Directives, dagql.DirectiveOrigin(obj.Module.OriginalName))
 
 	dag.Root().ObjectType().Extend(
 		spec,

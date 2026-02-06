@@ -53,6 +53,9 @@ func (g *GoGenerator) GenerateClientV2(ctx context.Context, schema *introspectio
 
 	clientDirAbsPath := filepath.Join(g.Config.OutputDir, clientConfig.ClientDir)
 	clientPkgInfo, err := g.getOrCreateClientGoMod(clientModName, clientDirAbsPath, mfs)
+	if err != nil {
+		return nil, err
+	}
 
 	slog.Info("generating files", "package import", clientPkgInfo.PackageName, "package name", clientPkgInfo.PackageImport)
 
@@ -95,6 +98,7 @@ func (g *GoGenerator) getOrCreateClientGoMod(clientModName string, clientDir str
 	// If the version of that module is not a dev version, we can pull the corresponding
 	// library from the registry. Otherwise, we let `go mod tidy` resolve the dependency.
 	if !isDevVersion(clientConfig.EngineVersion) {
+		slog.Info("setting client dagger.io/dagger package", "version", clientConfig.EngineVersion)
 		clientGoMod.AddRequire("dagger.io/dagger", clientConfig.EngineVersion)
 	}
 
@@ -116,6 +120,10 @@ func (g *GoGenerator) getOrCreateClientGoMod(clientModName string, clientDir str
 }
 
 func isDevVersion(version string) bool {
+	if version == "" {
+		return true
+	}
+
 	return strings.Contains(semver.Prerelease(version), "-dev-")
 }
 

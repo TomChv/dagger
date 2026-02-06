@@ -3,6 +3,7 @@ query ModuleSourceDependencies($source: ModuleSourceID!) {
     moduleOriginalName
     engineVersion
     dependencies {
+      id
       kind
       moduleOriginalName
       pin

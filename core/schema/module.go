@@ -2,6 +2,7 @@ package schema
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"path/filepath"
@@ -11,6 +12,7 @@ import (
 	"github.com/dagger/dagger/core"
 	"github.com/dagger/dagger/core/sdk"
 	"github.com/dagger/dagger/dagql"
+	"github.com/dagger/dagger/dagql/introspection"
 )
 
 type moduleSchema struct{}
@@ -132,6 +134,9 @@ func (s *moduleSchema) Install(dag *dagql.Server) {
 
 		dagql.Func("runtime", s.moduleRuntime).
 			Doc(`The container that runs the module's entrypoint. It will fail to execute if the module doesn't compile.`),
+
+		dagql.Func("jsonSchema", s.jsonSchema).
+			Doc("Return the GraphQL JSON schema of that module"),
 
 		dagql.Func("serve", s.moduleServe).
 			DoNotCache(`Mutates the calling session's global schema.`).
@@ -1144,4 +1149,49 @@ func (s *moduleSchema) loadSourceMap(ctx context.Context, sourceMap dagql.Option
 		return nil, fmt.Errorf("failed to decode source map: %w", err)
 	}
 	return sourceMapI.Self(), nil
+}
+
+func (s *moduleSchema) jsonSchema(ctx context.Context, curMod *core.Module, _ struct{}) (string, error) {
+	query, err := core.CurrentQuery(ctx)
+	if err != nil {
+		return "", err
+	}
+
+	cache, err := core.CurrentDagqlCache(ctx)
+	if err != nil {
+		return "", err
+	}
+
+	srv := dagql.NewServer(query, cache)
+
+	coreMod := &CoreMod{Dag: srv}
+	if err := coreMod.Install(ctx, srv); err != nil {
+		return "", err
+	}
+
+	if err := curMod.Install(ctx, srv); err != nil {
+		return "", err
+	}
+
+	data, err := srv.Query(ctx, introspection.Query, nil)
+	if err != nil {
+		return "", fmt.Errorf("introspection query failed: %w", err)
+	}
+
+	jsonBytes, err := json.Marshal(data)
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal introspection result: %w", err)
+	}
+
+	return string(jsonBytes), nil
+
+	// query, err := core.CurrentQuery(ctx)
+	//
+	//	if err != nil {
+	//		return inst, err
+	//	}
+	//
+	// modDeps := core.NewModDeps(query, []core.Mod{curMod})
+	//
+	// return modDeps.SchemaIntrospectionJSONFileForModule(ctx)
 }

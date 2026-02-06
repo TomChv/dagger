@@ -7,9 +7,11 @@ import (
 	"fmt"
 	"go/format"
 	"go/token"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"sort"
 	"strings"
 	"text/template"
@@ -37,6 +39,54 @@ type GoGenerator struct {
 	Config generator.Config
 }
 
+// Sort template keys for deterministic processing
+func sortTmplKeys(tmpls map[string]*template.Template) []string {
+	keys := make([]string, 0, len(tmpls))
+	for k := range tmpls {
+		keys = append(keys, k)
+	}
+
+	slices.Sort(keys)
+
+	return keys
+}
+
+func keepCoreSchemaOnly(schema *introspection.Schema) *introspection.Schema {
+	res := &introspection.Schema{
+		QueryType: schema.QueryType,
+	}
+
+	for _, i := range schema.Types {
+		if i.Name == "Query" {
+			queryType := &introspection.Type{
+				Kind:        i.Kind,
+				Name:        i.Name,
+				Description: i.Description,
+				Fields:      []*introspection.Field{},
+			}
+
+			for _, field := range i.Fields {
+				if field.Directives.Origin() == "" {
+					queryType.Fields = append(queryType.Fields, field)
+				}
+			}
+
+			res.Types = append(res.Types, queryType)
+		} else {
+			if i.Directives.Origin() == "" {
+				res.Types = append(res.Types, i)
+			}
+		}
+	}
+
+	content, err := json.Marshal(res)
+	if err == nil {
+		_ = os.WriteFile("core.schema.json", []byte(content), 0o644)
+	}
+
+	return res
+}
+
 func generateClient(
 	ctx context.Context,
 	cfg generator.Config,
@@ -48,50 +98,46 @@ func generateClient(
 	fset *token.FileSet,
 	pass int,
 ) error {
-	schemaJSON, err := json.Marshal(schema)
-	if err != nil {
-		return err
-	}
+	clientConfig := cfg.ClientConfig
 
-	fmt.Printf("%s\n", schemaJSON)
+	for _, dep := range clientConfig.ModuleDependencies {
+		depFuncs := templates.GoTemplateFuncs(ctx, dep.Schema, schemaVersion, cfg, pkg, fset, pass)
+		depTmpl := templates.ClientDependencyTemplates(dep.Name, depFuncs)
+		filename := fmt.Sprintf("%s.gen.go", dep.Name)
 
-	funcs := templates.GoTemplateFuncs(ctx, schema, schemaVersion, cfg, pkg, fset, pass)
-	tmpls := templates.ClientTemplates(funcs)
-
-	// Sort template keys for deterministic processing
-	keys := make([]string, 0, len(tmpls))
-	for k := range tmpls {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
-
-	for _, k := range keys {
-		tmpl := tmpls[k]
-		dt, err := renderFile(cfg.OutputDir, schema, schemaVersion, pkgInfo, tmpl)
+		slog.Info("generating dependency template", "name", dep.Name, "filename", filename)
+		dt, err := renderFile(clientConfig.ClientDir, dep.Schema, schemaVersion, pkgInfo, depTmpl)
 		if err != nil {
 			return err
 		}
 		if dt == nil {
-			// no contents, skip
 			continue
 		}
 
-		// Special case for client generation, we want to write the file in the specified client directory.
-		if cfg.ClientConfig != nil && cfg.ClientConfig.ClientDir != "" {
-			if err := mfs.MkdirAll(filepath.Join(cfg.ClientConfig.ClientDir, filepath.Dir(k)), 0o755); err != nil {
-				return err
-			}
-			if err := mfs.WriteFile(filepath.Join(cfg.ClientConfig.ClientDir, k), dt, 0600); err != nil {
-				return err
-			}
-
-			continue
-		}
-
-		if err := mfs.MkdirAll(filepath.Dir(k), 0o755); err != nil {
+		if err := mfs.WriteFile(filepath.Join(clientConfig.ClientDir, filename), dt, 0600); err != nil {
 			return err
 		}
-		if err := mfs.WriteFile(k, dt, 0600); err != nil {
+	}
+
+	// Generate the root client files.
+	coreSchema := keepCoreSchemaOnly(schema)
+	funcs := templates.GoTemplateFuncs(ctx, coreSchema, schemaVersion, cfg, pkg, fset, pass)
+	tmpls := templates.ClientRootTemplates(funcs)
+
+	for _, k := range sortTmplKeys(tmpls) {
+		tmpl := tmpls[k]
+		dt, err := renderFile(clientConfig.ClientDir, coreSchema, schemaVersion, pkgInfo, tmpl)
+		if err != nil {
+			return err
+		}
+		if dt == nil {
+			continue
+		}
+
+		if err := mfs.MkdirAll(filepath.Join(clientConfig.ClientDir, filepath.Dir(k)), 0o755); err != nil {
+			return err
+		}
+		if err := mfs.WriteFile(filepath.Join(clientConfig.ClientDir, k), dt, 0600); err != nil {
 			return err
 		}
 	}
@@ -175,6 +221,7 @@ func renderFile(
 
 	var render bytes.Buffer
 	if err := tmpl.Execute(&render, data); err != nil {
+		fmt.Printf("partial: %s\n", string(render.Bytes()))
 		return nil, err
 	}
 

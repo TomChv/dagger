@@ -237,6 +237,9 @@ func (iface *InterfaceType) Install(ctx context.Context, dag *dagql.Server) erro
 			fieldDef.Directives = append(fieldDef.Directives, fnTypeDef.SourceMap.Value.TypeDirective())
 		}
 
+		// Add the module this interface is originating
+		fieldDef.Directives = append(fieldDef.Directives, dagql.DirectiveOrigin(iface.mod.OriginalName))
+
 		for _, argMetadata := range fnTypeDef.Args {
 			// check whether this is a pre-existing object from a dependency module
 			argModType, ok, err := iface.mod.Deps.ModTypeFor(ctx, argMetadata.TypeDef)

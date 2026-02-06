@@ -9753,6 +9753,7 @@ type Module struct {
 
 	description *string
 	id          *ModuleID
+	jsonSchema  *string
 	name        *string
 	serve       *Void
 	sync        *ModuleID
@@ -10014,6 +10015,19 @@ func (r *Module) IntrospectionSchemaJSON() *File {
 	return &File{
 		query: q,
 	}
+}
+
+// Return the GraphQL JSON schema of that module
+func (r *Module) JSONSchema(ctx context.Context) (string, error) {
+	if r.jsonSchema != nil {
+		return *r.jsonSchema, nil
+	}
+	q := r.query.Select("jsonSchema")
+
+	var response string
+
+	q = q.Bind(&response)
+	return response, q.Execute(ctx)
 }
 
 // The name of the module

@@ -110,7 +110,7 @@ func (m *ModuleEnumType) getEnum(ctx context.Context) (*ModuleEnum, error) {
 	// If not check if the enum is part of its own module
 	for _, enumTypeDef := range m.mod.EnumDefs {
 		if enumTypeDef.AsEnum.Value.Name == m.typeDef.Name {
-			return &ModuleEnum{TypeDef: enumTypeDef.AsEnum.Value, Local: true}, nil
+			return &ModuleEnum{TypeDef: enumTypeDef.AsEnum.Value, Local: true, module: m.mod}, nil
 		}
 	}
 
@@ -126,6 +126,8 @@ type ModuleEnum struct {
 	// can use its OriginalName, but when converting it for other modules, we
 	// use the declared Name.
 	Local bool
+
+	module *Module
 }
 
 func (e *ModuleEnum) TypeName() string {
@@ -153,6 +155,9 @@ func (e *ModuleEnum) TypeDefinition(view call.View) *ast.Definition {
 	if e.TypeDef.SourceMap.Valid {
 		def.Directives = append(def.Directives, e.TypeDef.SourceMap.Value.TypeDirective())
 	}
+
+	def.Directives = append(def.Directives, dagql.DirectiveOrigin(e.module.OriginalName))
+
 	return def
 }
 

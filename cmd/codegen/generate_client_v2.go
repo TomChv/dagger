@@ -1,12 +1,16 @@
 package main
 
 import (
+	"context"
+	"encoding/json"
 	"fmt"
 	"log/slog"
+	"os"
 
 	"dagger.io/dagger"
 	"dagger.io/dagger/telemetry"
 	"github.com/dagger/dagger/cmd/codegen/generator"
+	"github.com/dagger/dagger/cmd/codegen/introspection"
 	"github.com/spf13/cobra"
 )
 
@@ -50,7 +54,7 @@ func GenerateClientV2(cmd *cobra.Command, args []string) error {
 			Source struct {
 				Name          string `json:"moduleOriginalName"`
 				EngineVersion string `json:"engineVersion"`
-				Dependencies  []generator.ModuleSourceDependency
+				Dependencies  []*generator.ModuleSourceDependency
 			}
 		}
 
@@ -76,6 +80,27 @@ func GenerateClientV2(cmd *cobra.Command, args []string) error {
 
 	cfg.ClientConfig = clientConfig
 
+	for _, dep := range cfg.ClientConfig.ModuleDependencies {
+		depSchema, err := extractModuleSchema(ctx, cfg.Dag, dep.Name, dep.ID)
+		if err != nil {
+			return err
+		}
+
+		dep.Schema = depSchema
+	}
+
+	// TODO: remove, it's just for debug
+	for _, dep := range cfg.ClientConfig.ModuleDependencies {
+		slog.Info("dep schema", "name", dep.Name)
+
+		content, err := json.Marshal(dep.Schema)
+		if err != nil {
+			return err
+		}
+
+		_ = os.WriteFile(fmt.Sprintf("schema-%s.json", dep.Name), []byte(content), 0o600)
+	}
+
 	generator, err := getGenerator(cfg)
 	if err != nil {
 		return fmt.Errorf("failed to get generator: %w", err)
@@ -84,6 +109,54 @@ func GenerateClientV2(cmd *cobra.Command, args []string) error {
 	slog.Info("generating SDK client", "language", cfg.Lang)
 
 	return Generate(ctx, cfg, generator.GenerateClientV2)
+}
+
+func extractModuleSchema(ctx context.Context, dag *dagger.Client, moduleName string, moduleID dagger.ModuleSourceID) (*introspection.Schema, error) {
+	slog.Info("getting schema for dependency", "name", moduleName, "id", moduleID)
+
+	// TODO: use the introspection schema instead once we use the engine.
+	jsonSchema, err := dag.LoadModuleSourceFromID(moduleID).AsModule().JSONSchema(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load schema for dependency: %w", err)
+	}
+
+	var introspectionResp introspection.Response
+	if err := json.Unmarshal([]byte(jsonSchema), &introspectionResp); err != nil {
+		return nil, err
+	}
+
+	res := &introspection.Schema{
+		QueryType: introspectionResp.Schema.QueryType,
+	}
+
+	for _, i := range introspectionResp.Schema.Types {
+		if i.Name == "Query" {
+			queryType := &introspection.Type{
+				Kind:        i.Kind,
+				Name:        i.Name,
+				Description: i.Description,
+				Fields:      []*introspection.Field{},
+			}
+
+			for _, field := range i.Fields {
+				if field.Directives.Origin() == moduleName {
+					queryType.Fields = append(queryType.Fields, field)
+				}
+			}
+
+			res.Types = append(res.Types, queryType)
+		}
+
+		if i.Directives.Origin() == moduleName {
+			slog.Info("found type for module", "module", moduleName, "type", i.Name)
+
+			res.Types = append(res.Types, i)
+		}
+	}
+	
+	generator.SetSchemaParents(res)
+
+	return res, nil
 }
 
 func init() {

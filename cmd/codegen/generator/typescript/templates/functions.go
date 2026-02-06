@@ -397,7 +397,7 @@ func (funcs typescriptTemplateFuncs) isClientOnly() bool {
 	return funcs.cfg.ClientConfig != nil
 }
 
-func (funcs typescriptTemplateFuncs) Dependencies() []generator.ModuleSourceDependency {
+func (funcs typescriptTemplateFuncs) Dependencies() []*generator.ModuleSourceDependency {
 	return funcs.cfg.ClientConfig.ModuleDependencies
 }
 

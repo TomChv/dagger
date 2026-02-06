@@ -13,13 +13,16 @@ var (
 	//go:embed all:src/*
 	tmplFS embed.FS
 
-	//go:embed all:client_src/*
-	clientTmplFs embed.FS
+	//go:embed all:client_src/root/*
+	clientRootTmplFS embed.FS
+
+	//go:embed all:client_src/dependency/*
+	clientDependencyTmplFS embed.FS
 
 	files map[string]*template.Template
 )
 
-func ClientTemplates(funcs template.FuncMap) map[string]*template.Template {
+func ClientRootTemplates(funcs template.FuncMap) map[string]*template.Template {
 	if files != nil {
 		for _, file := range files {
 			file.Funcs(funcs)
@@ -27,17 +30,17 @@ func ClientTemplates(funcs template.FuncMap) map[string]*template.Template {
 		return files
 	}
 
-	root := "client_src"
+	root := "client_src/root"
 
 	tmpl := template.New("").Funcs(funcs)
-	err := fs.WalkDir(clientTmplFs, root, func(path string, d fs.DirEntry, err error) error {
+	err := fs.WalkDir(clientRootTmplFS, root, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
 		if d.IsDir() {
 			return nil
 		}
-		ntmpl, err := template.New("").Funcs(funcs).ParseFS(clientTmplFs, path)
+		ntmpl, err := template.New("").Funcs(funcs).ParseFS(clientRootTmplFS, path)
 		if err != nil {
 			return err
 		}
@@ -52,7 +55,7 @@ func ClientTemplates(funcs template.FuncMap) map[string]*template.Template {
 	}
 
 	targets := []string{}
-	err = fs.WalkDir(clientTmplFs, root, func(path string, d fs.DirEntry, err error) error {
+	err = fs.WalkDir(clientRootTmplFS, root, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
@@ -80,6 +83,34 @@ func ClientTemplates(funcs template.FuncMap) map[string]*template.Template {
 		files[strings.TrimSuffix(target, ".tmpl")] = tmpl.Lookup(target)
 	}
 	return files
+}
+
+func ClientDependencyTemplates(depName string, funcs template.FuncMap) *template.Template {
+	root := "client_src/dependency"
+
+	tmpl := template.New("").Funcs(funcs)
+	err := fs.WalkDir(clientDependencyTmplFS, root, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() {
+			return nil
+		}
+		ntmpl, err := template.New("").Funcs(funcs).ParseFS(clientDependencyTmplFS, path)
+		if err != nil {
+			return err
+		}
+		ntmpl = ntmpl.Lookup(filepath.Base(path))
+
+		path = strings.TrimPrefix(path, root+"/")
+		tmpl.AddParseTree(path, ntmpl.Tree)
+		return nil
+	})
+	if err != nil {
+		panic(err)
+	}
+
+	return tmpl.Lookup("dependency.gen.go.tmpl")
 }
 
 func Templates(funcs template.FuncMap) map[string]*template.Template {

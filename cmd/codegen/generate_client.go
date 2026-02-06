@@ -54,7 +54,7 @@ func GenerateClient(cmd *cobra.Command, args []string) error {
 			Source struct {
 				Name          string `json:"moduleOriginalName"`
 				EngineVersion string `json:"engineVersion"`
-				Dependencies  []generator.ModuleSourceDependency
+				Dependencies  []*generator.ModuleSourceDependency
 			}
 		}
 

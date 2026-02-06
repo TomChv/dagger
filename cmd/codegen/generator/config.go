@@ -1,6 +1,9 @@
 package generator
 
-import "dagger.io/dagger"
+import (
+	"dagger.io/dagger"
+	"github.com/dagger/dagger/cmd/codegen/introspection"
+)
 
 type Config struct {
 	// Lang is the language to generate the module for.
@@ -65,10 +68,14 @@ type ModuleGeneratorConfig struct {
 }
 
 type ModuleSourceDependency struct {
+	ID     dagger.ModuleSourceID `json:"id"`
 	Kind   string
 	Name   string `json:"moduleOriginalName"`
 	Pin    string
 	Source string `json:"asString"`
+
+	// The GraphQL schema of that dependency
+	Schema *introspection.Schema
 }
 
 // Specific configuration for client generation.
@@ -82,7 +89,7 @@ type ClientGeneratorConfig struct {
 	// The list of all dependencies used by the module.
 	// This is used by the client generator to automatically serves the
 	// dependencies when connecting to the client.
-	ModuleDependencies []ModuleSourceDependency
+	ModuleDependencies []*ModuleSourceDependency
 
 	// The directory where the client will be generated.
 	ClientDir string

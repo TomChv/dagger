@@ -329,6 +329,9 @@ var coreDirectives = []DirectiveSpec{
 		Args:        NewInputSpecs(), // none
 		Locations: []DirectiveLocation{
 			DirectiveLocationFieldDefinition,
+		},
+	},
+	{
 		Name:        "origin",
 		Description: FormatDescription(`Indicates the origin of the object`),
 		Args: NewInputSpecs(

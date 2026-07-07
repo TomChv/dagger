@@ -413,7 +413,12 @@ func (s *moduleSchema) Install(dag *dagql.Server) {
 			Doc(`The generated clients this SDK produces in the workspace.`),
 	}.Install(dag)
 	dagql.Fields[*core.CurrentModuleAsSDKModule]{}.Install(dag)
-	dagql.Fields[*core.CurrentModuleAsSDKClient]{}.Install(dag)
+	dagql.Fields[*core.CurrentModuleAsSDKClient]{
+		dagql.Func("moduleSource", s.currentModuleAsSDKClientModuleSource).
+			View(AfterVersion("v1.0.0-0")).
+			DoNotCache("Resolves the bound module against live workspace config and host filesystem.").
+			Doc(`The module source the client is bound to, resolved from its module ref (and pin).`),
+	}.Install(dag)
 
 	dagql.Fields[*core.Function]{
 		dagql.Func("withDescription", s.functionWithDescription).

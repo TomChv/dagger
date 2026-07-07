@@ -4150,6 +4150,14 @@ class CurrentModuleAsSDKClient(Type):
         _ctx = self._select("module", _args)
         return await _ctx.execute(str)
 
+    def module_source(self) -> "ModuleSource":
+        """The module source the client is bound to, resolved from its module ref
+        (and pin).
+        """
+        _args: list[Arg] = []
+        _ctx = self._select("moduleSource", _args)
+        return ModuleSource(_ctx)
+
     async def path(self) -> str:
         """Workspace-root-relative path of the generated client.
 
@@ -12208,6 +12216,22 @@ class ModuleSource(Type):
         _args: list[Arg] = []
         _ctx = self._select("blueprint", _args)
         return ModuleSource(_ctx)
+
+    def client_schema_introspection_json(self) -> File:
+        """The client-facing introspection schema JSON file for this module
+        source.
+
+        This is the full schema an SDK feeds to its client code generator: the
+        module's dependency closure plus, when the module has its own
+        SDK+Runtime, the module's own types promoted to Query for self-
+        bindings.
+
+        Unlike introspectionSchemaJSON, this is the client-facing schema: no
+        core types are hidden.
+        """
+        _args: list[Arg] = []
+        _ctx = self._select("clientSchemaIntrospectionJSON", _args)
+        return File(_ctx)
 
     async def clone_ref(self) -> str:
         """The ref to clone the root of the git repo from. Only valid for git

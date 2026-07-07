@@ -4719,6 +4719,15 @@ impl CurrentModuleAsSdkClient {
         let query = self.selection.select("module");
         query.execute(self.graphql_client.clone()).await
     }
+    /// The module source the client is bound to, resolved from its module ref (and pin).
+    pub fn module_source(&self) -> ModuleSource {
+        let query = self.selection.select("moduleSource");
+        ModuleSource {
+            proc: self.proc.clone(),
+            selection: query,
+            graphql_client: self.graphql_client.clone(),
+        }
+    }
     /// Workspace-root-relative path of the generated client.
     pub async fn path(&self) -> Result<String, DaggerError> {
         let query = self.selection.select("path");
@@ -12772,6 +12781,17 @@ impl ModuleSource {
     pub fn blueprint(&self) -> ModuleSource {
         let query = self.selection.select("blueprint");
         ModuleSource {
+            proc: self.proc.clone(),
+            selection: query,
+            graphql_client: self.graphql_client.clone(),
+        }
+    }
+    /// The client-facing introspection schema JSON file for this module source.
+    /// This is the full schema an SDK feeds to its client code generator: the module's dependency closure plus, when the module has its own SDK+Runtime, the module's own types promoted to Query for self-bindings.
+    /// Unlike introspectionSchemaJSON, this is the client-facing schema: no core types are hidden.
+    pub fn client_schema_introspection_json(&self) -> File {
+        let query = self.selection.select("clientSchemaIntrospectionJSON");
+        File {
             proc: self.proc.clone(),
             selection: query,
             graphql_client: self.graphql_client.clone(),

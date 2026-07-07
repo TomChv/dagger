@@ -304,6 +304,104 @@ func (m *Consumer) SyncGenerators(ctx context.Context, workspace *dagger.Workspa
 	require.NotContains(t, out, "result *core.Changeset is detached")
 }
 
+// TestCurrentModuleAsSDKClientModuleSource exercises the engine primitives that
+// let an SDK module own client codegen: an SDK module (installed with an as-sdk
+// marker and a registered client) reads its client's bound module through
+// CurrentModuleAsSDKClient.moduleSource, then reads that resolved ModuleSource's
+// provenance (moduleOriginalName / engineVersion) and its client-facing schema
+// (moduleSource.clientSchemaIntrospectionJSON). This is the surface a future
+// generateAllClient generator uses instead of the engine's clientGenerate loop.
+func (GeneratorsSuite) TestCurrentModuleAsSDKClientModuleSource(ctx context.Context, t *testctx.T) {
+	c := connect(ctx, t)
+
+	modGen := goGitBase(t, c).
+		WithEnvVariable("_EXPERIMENTAL_DAGGER_CLI_BIN", testCLIBinPath).
+		With(nonNestedDevEngine(c)).
+		WithNewFile("dagger.toml", `[modules.consumer]
+source = ".dagger/modules/consumer"
+entrypoint = true
+
+[modules.consumer.as-sdk]
+name = "consumer"
+
+[[modules.consumer.as-sdk.clients]]
+path = "generated"
+module = ".dagger/modules/targetmod"
+
+[modules.go-sdk]
+source = "github.com/dagger/go-sdk"
+
+[modules.go-sdk.as-sdk]
+name = "go"
+`).
+		WithNewFile(".dagger/modules/consumer/dagger.json", `{
+  "name": "consumer",
+  "engineVersion": "latest",
+  "sdk": { "source": "go" },
+  "source": "."
+}`).
+		WithNewFile(".dagger/modules/consumer/main.go", `package main
+
+import (
+	"context"
+	"fmt"
+	"strings"
+
+	"dagger/consumer/internal/dagger"
+)
+
+type Consumer struct{}
+
+func (m *Consumer) InspectClient(ctx context.Context) (string, error) {
+	clients, err := dag.CurrentModule().AsSDK().Clients(ctx)
+	if err != nil {
+		return "", err
+	}
+	if len(clients) != 1 {
+		return "", fmt.Errorf("expected 1 client, got %d", len(clients))
+	}
+	var client dagger.CurrentModuleAsSDKClient = clients[0]
+	src := client.ModuleSource()
+
+	name, err := src.ModuleOriginalName(ctx)
+	if err != nil {
+		return "", err
+	}
+	engineVersion, err := src.EngineVersion(ctx)
+	if err != nil {
+		return "", err
+	}
+	schema, err := src.ClientSchemaIntrospectionJSON().Contents(ctx)
+	if err != nil {
+		return "", err
+	}
+
+	return fmt.Sprintf("name=%s engineSet=%t schemaHasTarget=%t",
+		name, engineVersion != "", strings.Contains(schema, "Targetmod")), nil
+}
+`).
+		WithNewFile(".dagger/modules/targetmod/dagger.json", `{
+  "name": "targetmod",
+  "engineVersion": "latest",
+  "sdk": { "source": "go" },
+  "source": "."
+}`).
+		WithNewFile(".dagger/modules/targetmod/main.go", `package main
+
+type Targetmod struct{}
+
+func (m *Targetmod) Hello() string { return "hi" }
+`)
+
+	out, err := modGen.
+		With(daggerNonNestedExec("call", "inspect-client")).
+		CombinedOutput(ctx)
+	require.NoError(t, err, out)
+	require.Contains(t, out, "name=targetmod")
+	require.Contains(t, out, "engineSet=true")
+	require.Contains(t, out, "schemaHasTarget=true")
+}
+
 // TestWorkspaceGenerateNarrowsToRequestedModule locks in that
 // `dagger generate <module>` only loads the named generator's module. The
 // workspace generators resolver loads modules on demand from its include

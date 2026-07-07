@@ -41,6 +41,19 @@ class ModuleSource extends Client\AbstractObject implements Client\IdAble, Node,
     }
 
     /**
+     * The client-facing introspection schema JSON file for this module source.
+     *
+     * This is the full schema an SDK feeds to its client code generator: the module's dependency closure plus, when the module has its own SDK+Runtime, the module's own types promoted to Query for self-bindings.
+     *
+     * Unlike introspectionSchemaJSON, this is the client-facing schema: no core types are hidden.
+     */
+    public function clientSchemaIntrospectionJSON(): File
+    {
+        $innerQueryBuilder = new \Dagger\Client\QueryBuilder('clientSchemaIntrospectionJSON');
+        return new \Dagger\File($this->client, $this->queryBuilderChain->chain($innerQueryBuilder));
+    }
+
+    /**
      * The ref to clone the root of the git repo from. Only valid for git sources.
      */
     public function cloneRef(): string

@@ -5702,6 +5702,14 @@ export class CurrentModuleAsSDKClient extends BaseClient {
   }
 
   /**
+   * The module source the client is bound to, resolved from its module ref (and pin).
+   */
+  moduleSource = (): ModuleSource => {
+    const ctx = this._ctx.select("moduleSource")
+    return new ModuleSource(ctx)
+  }
+
+  /**
    * Workspace-root-relative path of the generated client.
    */
   path = async (): Promise<string> => {
@@ -12131,6 +12139,18 @@ export class ModuleSource extends BaseClient {
   blueprint = (): ModuleSource => {
     const ctx = this._ctx.select("blueprint")
     return new ModuleSource(ctx)
+  }
+
+  /**
+   * The client-facing introspection schema JSON file for this module source.
+   *
+   * This is the full schema an SDK feeds to its client code generator: the module's dependency closure plus, when the module has its own SDK+Runtime, the module's own types promoted to Query for self-bindings.
+   *
+   * Unlike introspectionSchemaJSON, this is the client-facing schema: no core types are hidden.
+   */
+  clientSchemaIntrospectionJSON = (): File => {
+    const ctx = this._ctx.select("clientSchemaIntrospectionJSON")
+    return new File(ctx)
   }
 
   /**

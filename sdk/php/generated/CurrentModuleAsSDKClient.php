@@ -32,6 +32,15 @@ class CurrentModuleAsSDKClient extends Client\AbstractObject implements Client\I
     }
 
     /**
+     * The module source the client is bound to, resolved from its module ref (and pin).
+     */
+    public function moduleSource(): ModuleSource
+    {
+        $innerQueryBuilder = new \Dagger\Client\QueryBuilder('moduleSource');
+        return new \Dagger\ModuleSource($this->client, $this->queryBuilderChain->chain($innerQueryBuilder));
+    }
+
+    /**
      * Workspace-root-relative path of the generated client.
      */
     public function path(): string

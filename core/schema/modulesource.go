@@ -238,6 +238,12 @@ func (s *moduleSourceSchema) Install(dag *dagql.Server) {
 				`This file represents the schema visible to the module's source code, including all core types and those from the dependencies.`,
 				`Note: this is in the context of a module, so some core types may be hidden.`),
 
+		dagql.NodeFunc("clientSchemaIntrospectionJSON", s.moduleSourceClientSchemaIntrospectionJSON).
+			View(AfterVersion("v1.0.0-0")).
+			Doc(`The client-facing introspection schema JSON file for this module source.`,
+				`This is the full schema an SDK feeds to its client code generator: the module's dependency closure plus, when the module has its own SDK+Runtime, the module's own types promoted to Query for self-bindings.`,
+				`Unlike introspectionSchemaJSON, this is the client-facing schema: no core types are hidden.`),
+
 		dagql.NodeFunc("directory", s.moduleSourceDirectory).
 			Doc(`The directory containing the module configuration and source code (source code may be in a subdir).`).
 			Args(
@@ -2670,34 +2676,7 @@ func (s *moduleSourceSchema) runClientGenerator(
 		return genDirInst, fmt.Errorf("failed to add module source required files: %w", err)
 	}
 
-	deps, err := s.loadDependencyModules(ctx, srcInst, srcInst)
-	if err != nil {
-		return genDirInst, fmt.Errorf("failed to load dependencies of this modules: %w", err)
-	}
-
-	// Build the client-facing schema. Dependencies get normal installation;
-	// the self module (when present) is installed as an entrypoint so its
-	// methods are promoted to Query.
-	codegenDeps := deps
-
-	// If the current module source has sources and its SDK implements the `Runtime` interface,
-	// we can transform it into a module to generate self bindings.
-	if srcInst.Self().SDK != nil {
-		// We must make sure to first check SDK to avoid checking a nil pointer on `SDKImpl`.
-		if _, ok := srcInst.Self().SDKImpl.AsRuntime(); ok {
-			var mod dagql.ObjectResult[*core.Module]
-			err = dag.Select(ctx, srcInst, &mod, dagql.Selector{
-				Field: "asModule",
-			})
-			if err != nil {
-				return genDirInst, fmt.Errorf("failed to transform module source into module: %w", err)
-			}
-
-			codegenDeps = codegenDeps.With(core.NewUserMod(mod), core.InstallOpts{Entrypoint: true})
-		}
-	}
-
-	schemaJSONFile, err := codegenDeps.SchemaIntrospectionJSONFileForClient(ctx)
+	schemaJSONFile, err := s.clientSchemaIntrospectionJSONFile(ctx, srcInst)
 	if err != nil {
 		return genDirInst, fmt.Errorf("failed to get schema for client generation: %w", err)
 	}
@@ -2736,6 +2715,64 @@ func (s *moduleSourceSchema) runClientGenerator(
 	}
 
 	return genDirInst, nil
+}
+
+func (s *moduleSourceSchema) moduleSourceClientSchemaIntrospectionJSON(
+	ctx context.Context,
+	src dagql.ObjectResult[*core.ModuleSource],
+	_ struct{},
+) (dagql.Result[*core.File], error) {
+	return s.clientSchemaIntrospectionJSONFile(ctx, src)
+}
+
+// clientSchemaIntrospectionJSONFile builds the client-facing GraphQL introspection
+// schema for a module source: the module's dependency closure plus, when the module
+// has its own SDK+Runtime, the module itself installed as an entrypoint so its own
+// types are promoted to Query for self-bindings. Unlike the module-facing
+// SchemaIntrospectionJSONFileForModule, no core types are hidden. It is the schema an
+// SDK feeds to its client code generator, and is shared with runClientGenerator.
+func (s *moduleSourceSchema) clientSchemaIntrospectionJSONFile(
+	ctx context.Context,
+	srcInst dagql.ObjectResult[*core.ModuleSource],
+) (dagql.Result[*core.File], error) {
+	var zero dagql.Result[*core.File]
+
+	query, err := core.CurrentQuery(ctx)
+	if err != nil {
+		return zero, err
+	}
+	dag, err := query.Server.Server(ctx)
+	if err != nil {
+		return zero, fmt.Errorf("failed to get dag server: %w", err)
+	}
+
+	deps, err := s.loadDependencyModules(ctx, srcInst, srcInst)
+	if err != nil {
+		return zero, fmt.Errorf("failed to load dependencies of this module: %w", err)
+	}
+
+	// Dependencies get normal installation; the self module (when present) is
+	// installed as an entrypoint so its methods are promoted to Query.
+	codegenDeps := deps
+
+	// If the current module source has sources and its SDK implements the `Runtime`
+	// interface, transform it into a module to generate self bindings.
+	if srcInst.Self().SDK != nil {
+		// Check SDK first to avoid a nil pointer on `SDKImpl`.
+		if _, ok := srcInst.Self().SDKImpl.AsRuntime(); ok {
+			var mod dagql.ObjectResult[*core.Module]
+			err = dag.Select(ctx, srcInst, &mod, dagql.Selector{
+				Field: "asModule",
+			})
+			if err != nil {
+				return zero, fmt.Errorf("failed to transform module source into module: %w", err)
+			}
+
+			codegenDeps = codegenDeps.With(core.NewUserMod(mod), core.InstallOpts{Entrypoint: true})
+		}
+	}
+
+	return codegenDeps.SchemaIntrospectionJSONFileForClient(ctx)
 }
 
 // runGeneratedContext runs codegen, client generation, and module config writing for the given

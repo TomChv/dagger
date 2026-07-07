@@ -58,6 +58,24 @@ defmodule Dagger.ModuleSource do
   end
 
   @doc """
+  The client-facing introspection schema JSON file for this module source.
+
+  This is the full schema an SDK feeds to its client code generator: the module's dependency closure plus, when the module has its own SDK+Runtime, the module's own types promoted to Query for self-bindings.
+
+  Unlike introspectionSchemaJSON, this is the client-facing schema: no core types are hidden.
+  """
+  @spec client_schema_introspection_json(t()) :: Dagger.File.t()
+  def client_schema_introspection_json(%__MODULE__{} = module_source) do
+    query_builder =
+      module_source.query_builder |> QB.select("clientSchemaIntrospectionJSON")
+
+    %Dagger.File{
+      query_builder: query_builder,
+      client: module_source.client
+    }
+  end
+
+  @doc """
   The ref to clone the root of the git repo from. Only valid for git sources.
   """
   @spec clone_ref(t()) :: {:ok, String.t()} | {:error, term()}

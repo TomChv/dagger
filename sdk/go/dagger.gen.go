@@ -4182,6 +4182,15 @@ func (r *CurrentModuleAsSDKClient) Module(ctx context.Context) (string, error) {
 	return response, q.Execute(ctx)
 }
 
+// The module source the client is bound to, resolved from its module ref (and pin).
+func (r *CurrentModuleAsSDKClient) ModuleSource() *ModuleSource {
+	q := r.query.Select("moduleSource")
+
+	return &ModuleSource{
+		query: q,
+	}
+}
+
 // Workspace-root-relative path of the generated client.
 func (r *CurrentModuleAsSDKClient) Path(ctx context.Context) (string, error) {
 	if r.path != nil {
@@ -12240,6 +12249,19 @@ func (r *ModuleSource) Blueprint() *ModuleSource {
 	q := r.query.Select("blueprint")
 
 	return &ModuleSource{
+		query: q,
+	}
+}
+
+// The client-facing introspection schema JSON file for this module source.
+//
+// This is the full schema an SDK feeds to its client code generator: the module's dependency closure plus, when the module has its own SDK+Runtime, the module's own types promoted to Query for self-bindings.
+//
+// Unlike introspectionSchemaJSON, this is the client-facing schema: no core types are hidden.
+func (r *ModuleSource) ClientSchemaIntrospectionJSON() *File {
+	q := r.query.Select("clientSchemaIntrospectionJSON")
+
+	return &File{
 		query: q,
 	}
 }

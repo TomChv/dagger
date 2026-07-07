@@ -6,6 +6,7 @@ import (
 
 	"github.com/dagger/dagger/core"
 	"github.com/dagger/dagger/core/workspace"
+	"github.com/dagger/dagger/dagql"
 )
 
 // currentModuleAsSDK treats the currently executing module as an SDK installed
@@ -92,4 +93,46 @@ func (s *moduleSchema) currentModuleAsSDKClients(
 	_ struct{},
 ) ([]*core.CurrentModuleAsSDKClient, error) {
 	return parent.Clients, nil
+}
+
+// currentModuleAsSDKClientModuleSource resolves the module a client is bound to
+// into a full ModuleSource, honoring the client's pin and canonical/remote refs
+// via the same engine resolution the workspace client-generate path uses. It
+// returns the plain resolved source (not a scoped form), so the SDK can read its
+// dependency provenance, name, and engine version for client codegen.
+func (s *moduleSchema) currentModuleAsSDKClientModuleSource(
+	ctx context.Context,
+	client *core.CurrentModuleAsSDKClient,
+	_ struct{},
+) (dagql.ObjectResult[*core.ModuleSource], error) {
+	var res dagql.ObjectResult[*core.ModuleSource]
+
+	query, err := core.CurrentQuery(ctx)
+	if err != nil {
+		return res, err
+	}
+	ws, err := query.Server.CurrentWorkspace(ctx)
+	if err != nil {
+		return res, fmt.Errorf("get current workspace: %w", err)
+	}
+	if isSyntheticWorkspace(ws) || ws.ConfigFile == "" {
+		return res, fmt.Errorf("current module is not installed as an SDK in this workspace")
+	}
+
+	moduleRef, moduleLoadRef, err := resolveWorkspaceClientModuleRef(ws, client.Module)
+	if err != nil {
+		return res, err
+	}
+
+	workspaceCtx, err := withWorkspaceClientContext(ctx, ws)
+	if err != nil {
+		return res, fmt.Errorf("workspace client context: %w", err)
+	}
+	workspaceCtx = workspaceInstallLookupContext(workspaceCtx)
+
+	src, err := (&workspaceSchema{}).resolveClientTargetModule(workspaceCtx, moduleLoadRef, client.Pin)
+	if err != nil {
+		return res, fmt.Errorf("resolve module %q for client %q: %w", moduleRef, client.Path, err)
+	}
+	return src, nil
 }

@@ -16202,6 +16202,12 @@ pub struct WorkspaceGeneratorsOpts<'a> {
     pub include: Option<Vec<&'a str>>,
 }
 #[derive(Builder, Debug, PartialEq)]
+pub struct WorkspaceModuleSourceOpts<'a> {
+    /// Location of the module source to load, relative to the workspace cwd or absolute from the workspace root.
+    #[builder(setter(into, strip_option), default)]
+    pub path: Option<&'a str>,
+}
+#[derive(Builder, Debug, PartialEq)]
 pub struct WorkspaceSearchOpts<'a> {
     /// Allow the . pattern to match newlines in multiline mode.
     #[builder(setter(into, strip_option), default)]
@@ -16629,6 +16635,39 @@ impl Workspace {
         let mut query = self.selection.select("module");
         query = query.arg("name", name.into());
         WorkspaceModule {
+            proc: self.proc.clone(),
+            selection: query,
+            graphql_client: self.graphql_client.clone(),
+        }
+    }
+    /// Load a module source from a path within the workspace.
+    /// Relative paths (e.g., "foo") resolve from the workspace cwd; absolute paths (e.g., "/foo") resolve from the workspace root.
+    /// Fails if the path does not point to an initialized module.
+    ///
+    /// # Arguments
+    ///
+    /// * `opt` - optional argument, see inner type for documentation, use <func>_opts to use
+    pub fn module_source(&self) -> ModuleSource {
+        let query = self.selection.select("moduleSource");
+        ModuleSource {
+            proc: self.proc.clone(),
+            selection: query,
+            graphql_client: self.graphql_client.clone(),
+        }
+    }
+    /// Load a module source from a path within the workspace.
+    /// Relative paths (e.g., "foo") resolve from the workspace cwd; absolute paths (e.g., "/foo") resolve from the workspace root.
+    /// Fails if the path does not point to an initialized module.
+    ///
+    /// # Arguments
+    ///
+    /// * `opt` - optional argument, see inner type for documentation, use <func>_opts to use
+    pub fn module_source_opts<'a>(&self, opts: WorkspaceModuleSourceOpts<'a>) -> ModuleSource {
+        let mut query = self.selection.select("moduleSource");
+        if let Some(path) = opts.path {
+            query = query.arg("path", path);
+        }
+        ModuleSource {
             proc: self.proc.clone(),
             selection: query,
             graphql_client: self.graphql_client.clone(),
